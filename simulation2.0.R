@@ -65,7 +65,6 @@ DO_simulate<-function(NEP,Ksed){
   hypo_o2 = c()
   epil.O2 = c()
   kO2 = c()
-  
   Fatm=c()
   o2sat=c()
   
@@ -93,7 +92,11 @@ DO_simulate<-function(NEP,Ksed){
       #epilimnion:In-out+nep+Fatm
       kO2[i] <- k600.2.kGAS.base(k600=K600,temperature=temp,gas='O2')
       o2sat[i]<-o2.at.sat.base(temp=temp,altitude = 300)
+     
+      #### bugs !
       Fatm[i] <- kO2[i]*(o2sat[i]-epil.O2[i-1]/vol[i-1,1])*area
+      ###
+      
       epil.O2[i] = epil.O2[i-1]+In-Out+Fatm[i]+NEP[i]
       #Hypo(set it the same as epil)
       hypo_o2[i] = epil.O2[i]
@@ -101,7 +104,7 @@ DO_simulate<-function(NEP,Ksed){
     #Day 111 - 290
     else if(stratify_day<i&i<mix_day){
       #calculate flux(unit?)
-      volumechange_hypo = vol[i,2]-vol[i-1,2]  #in m^3?
+      volumechange_hypo = vol[i,2]-vol[i-1,2]  #in m^3
       volumechange_hypo_proportion =  volumechange_hypo/vol[i-1,2]
       o2delivery = volumechange_hypo_proportion*hypo_o2[i-1]
       #O2 delivery/ Volume of hypo(?) = flux
@@ -114,41 +117,35 @@ DO_simulate<-function(NEP,Ksed){
       #epil
       kO2[i] <- k600.2.kGAS.base(k600=K600,temperature=temp,gas='O2')#m/day
       o2sat[i]<-o2.at.sat.base(temp=temp,altitude = 300)
+      
+      ##bugs for fatm
       Fatm[i] <- kO2[i]*(o2sat[i]-epil.O2[i-1]/vol[i-1,1])*area 
+      ##
+      
       epil.O2[i] = epil.O2[i-1]+Fatm[i]+NEP[i]-Fhypo[i]
     }
     #day = mix day
     else {
-      epil.O2[i] = (hypo.02.at.sat.base[i]*sample_v$HypoV[i]+epi.02.at.sat.base[i]*sample_v$EpiV[i])/(sample_v$HypoV[i]+sample_v$EpiV[i])
+      epil.O2[i] = (epil.O2[i-1]+hypo_o2[i-1])/2
+      hypo_o2[i] = epil.O2[i]  
     }
-    # else if(i==mix_day){
-    #   epil.O2[i] = (hypo.02.at.sat.base[i]*sample_v$HypoV[i]+epi.02.at.sat.base[i]*sample_v$EpiV[i])/(sample_v$HypoV[i]+sample_v$EpiV[i])
-    #   
-    #   #epil.O2[i] = (epil.O2[i-1]*vol[i,1]+hypo_o2[i-1]*vol[i,2])/(vol[i,1]+vol[i,2])
-    #   hypo_o2[i] = epil.O2[i]
-    # }
-    # else if(i>mix_day){
-    #   #epilimnion:In-out+nep+Fatm
-    #   kO2<- k600.2.kGAS.base(k600=K600,temperature=temp,gas='O2')
-    #   o2sat<-o2.at.sat.base(temp=temp,altitude = 300)
-    #   Fatm <- kO2*(o2sat-epil.O2[i-1]) 
-    #   epil.O2[i] = epil.O2[i-1]+In-Out+Fatm+NEP[i]
-    #   #Hypo(set it the same as epil)
-    #   hypo_o2[i] = epil.O2[i]
-    # }
-  # }
     
   }  
-  return(list(hypo = hypo_o2,epil=epil.O2,ko2 = kO2,fatm = Fatm))
+  return(list(hypo = hypo_o2,epil=epil.O2,ko2 = kO2,fatm = Fatm,sat=o2sat))
 }
 result<-DO_simulate(nep,fked)
 
-x <- seq(1,365)#plot every 5 days
+result$fatm
+
+x <- seq(1,mix_day)#plot every 5 days
 #plot(x,y = result$ko2,pch =1,ylim = c(0,50),main="DO simulation",xlab = "day",ylab = "DO")
-plot(x,y = result$hypo[x]/vol[x,2],pch =1,ylim = c(0,50),main="DO simulation",xlab = "day",ylab = "DO")
-points(x,y=result$epil[x]/vol[x,1],col="blue")
+plot(x,y = result$epil[x]/vol[x,1],pch =1,xlim=c(0,365),ylim = c(0,50),col="blue",main="DO simulation",xlab = "day",ylab = "DO")
 
+x <- seq(mix_day,stratify_day)
+points(x,y=result$hypo[x]/vol[x,2],col="black")
 
+x <- seq(mix_day,365)
+points(x,y=result$hypo[x]*2/(vol[x,2]+vol[x,1]),col="black")
 
 legend("topright",
        c("epilimnion(model)","hypolimnion(model)","epilimnion(1980)","hypolimnion(1980)"),
@@ -157,5 +154,3 @@ legend("topright",
 #true sampling data
 points(sample_v$avgHypoDO*0.032,col="purple")
 points(o2.at.sat.base(temp = sample_v$avgEpiT,altitude = 300),col="yellow")
-
-
